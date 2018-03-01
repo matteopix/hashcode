@@ -5,24 +5,25 @@ class V(object):
         self.x = 0
         self.y = 0
         self.ride = None
-        self.last_step = 0
+        self.last_step = -1
         self.ride_step = 0
         self.a_step = 0
         self.w_step = 0
         self.rides = []
 
     def is_busy(self, step):
-        if step < self.last_step:
+        if step <= self.last_step:
+#        if step < self.last_step:
             return 1
         return 0
 
     def add_ride(self, step, ride):
         self.ride_step = abs(ride.x - ride.a) + abs(ride.y - ride.b)
         self.a_step = abs(self.x - ride.a) + abs(self.y - ride.b)
-        self.w_step = 0
+        self.w_step = step + self.a_step
         if step + self.a_step <= ride.e:
             self.w_step = ride.e
-        self.last_step = step + self.a_step + self.w_step + self.ride_step
+        self.last_step = self.w_step + self.ride_step
         self.x = ride.x
         self.y = ride.y
         self.rides.append(ride.i)
@@ -53,6 +54,31 @@ class Info(object):
     def __str__(self):
         """Display the matrix."""
         return '\n'.join(['<%s>' % ''.join(row) for row in self.rides])
+
+    # def get_score(self):
+    #     return 
+
+    def get_ride_index(self, step, v, rides):
+        max_score = 0
+        index = -1
+        c = len(rides)
+        for i in range(0, c):
+            r = rides[i]
+            ride_score = abs(r.x - r.a) + abs(r.y - r.b)
+            a_step = abs(v.x - r.a) + abs(v.y - r.b)
+            w_step = step + a_step
+            bonus_score = 0
+            if w_step <= r.e:
+                bonus_score = self.b
+                w_step = r.e
+            if r.l < w_step + ride_score:
+                ride_score = 0
+            total_score = bonus_score + ride_score
+            if total_score > max_score:
+                max_score = total_score
+                index = i
+
+        return index
     
     def loop(self):
         rides_todo = []
@@ -65,10 +91,11 @@ class Info(object):
             rides_todo[r].i = r
             
         for t in range(0, self.s):
-            if len(rides_todo) > 0:
-                for v in range(0, self.v):
+            for v in range(0, self.v):
+                if len(rides_todo) > 0:
                     if self.vehicles[v].is_busy(t) == 0:
-                        self.vehicles[v].add_ride(t, rides_todo.pop(0))
+                        ride_index = self.get_ride_index(t, self.vehicles[v], rides_todo)
+                        self.vehicles[v].add_ride(t, rides_todo.pop(ride_index))
 
 def read_matrix(filename):
     """Read the input file."""
