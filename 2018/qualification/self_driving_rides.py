@@ -40,6 +40,48 @@ class Ride(object):
         self.steps = abs(x - a) + abs(y - b)
         self.i = 0
 
+class Data(object):
+    """Data with its statistics"""
+    def __init__(self):
+        self.min = 1000000 # todo: improvable
+        self.max = 0
+        self.total = 0
+        self.hit = 0
+
+    def get_statistics(self):
+        return ('%d (%d < %d < %d)' % (self.total, self.min, int(self.total / self.hit), self.max))
+
+    def update_statistics(self, value):
+        if self.min > value:
+            self.min = value
+        if self.max < value:
+            self.max = value
+        self.total += value
+        self.hit += 1
+        
+class Statistics(object):
+    """Rides Statistics"""
+    def __init__(self):
+        self.max_total_bonus = 0
+        self.max_total_steps = 0
+        self.total_bonus = 0
+        self.total_score = 0
+        self.steps = Data()
+        self.arrive_steps = Data()
+        self.lost_steps = Data()
+
+    def print_statistics(self):
+        print('Score: %d / %d (of which steps: %d / %d, and bonus: %d / %d)' % (self.total_score, (self.steps.total + self.max_total_bonus), (self.total_score - self.total_bonus), self.steps.total, self.total_bonus, self.max_total_bonus))
+        print('Ride steps: %s' % self.steps.get_statistics())
+        print('Total arrive steps: %s)' % self.arrive_steps.get_statistics())
+        print('Total lost steps: %s' % self.lost_steps.get_statistics())
+
+    def update_statistics(self, score, bonus, arrive, lost_steps):
+        self.total_score += score
+        self.total_bonus += bonus
+        self.arrive_steps.update_statistics(arrive)
+        self.lost_steps.update_statistics(lost_steps)
+
 class Resources(object):
     """Resources"""
     def __init__(self, rows, cols, v, r, b, s):
@@ -51,9 +93,33 @@ class Resources(object):
         self.s = s
         self.rides = []
         self.vehicles = []
+        self.rs = Statistics()
+        
+    def get_ride_statistics(self):
+        vehicle = self.v
+        self.rs.steps.min = self.rides[0].steps
+        self.rs.steps.max = self.rides[0].steps
+        for r in range(0, self.r):
+            # max_total_bonus
+            if self.rides[r].e == 0 and self.rides[r].x == 0 and self.rides[r].y == 0 and vehicle > 0:
+                vehicle -= 1
+                self.rs.max_total_bonus += self.b
+            if self.rides[r].e > 0:
+                self.rs.max_total_bonus += self.b
+            # rides steps: min, max and todo
+            if self.rs.steps.min > self.rides[r].steps:
+                self.rs.steps.min = self.rides[r].steps
+            if self.rs.steps.max < self.rides[r].steps:
+                self.rs.steps.max = self.rides[r].steps
+            self.rs.steps.total += self.rides[r].steps
+            self.rs.steps.hit += 1
 
     def get_ride_index(self, step, v, rides):
         max_weight = 0
+        score = 0
+        bonus = 0
+        arrive = 0
+        lost = 0
         index = 0 # if no ride is assigned
         c = len(rides)
         for i in range(0, c):
@@ -76,7 +142,12 @@ class Resources(object):
                 weight += bonus_score
             if weight > max_weight:
                 max_weight = weight
+                score = total_score
+                bonus = bonus_score
+                arrive = a_step
+                lost = lost_steps
                 index = i
+        self.rs.update_statistics(score, bonus, arrive, lost)
         return index
     
     def drive(self):
@@ -91,6 +162,10 @@ class Resources(object):
                     if self.vehicles[v].is_busy(t) == 0:
                         ride_index = self.get_ride_index(t, self.vehicles[v], rides_todo)
                         self.vehicles[v].add_ride(t, rides_todo.pop(ride_index))
+                else:
+                    print('Rides have been finished and it is step number %d / %d' % (t, self.s))
+                    return
+        print('How many rides are to be completed? %d / %d' % (len(rides_todo), self.r))
 
 def read_input(filename):
     """Read the input file."""
@@ -119,9 +194,14 @@ def main():
     # read data and initialize the matrix
     resource = read_input(sys.argv[1])
 
+    # create statistics
+    resource.get_ride_statistics()
+
     # self driving rides
     resource.drive()
 
+    # print statistics
+    resource.rs.print_statistics()
 
     # write output file
     write_output(resource, sys.argv[2])
